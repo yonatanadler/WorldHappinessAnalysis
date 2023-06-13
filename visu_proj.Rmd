@@ -1,0 +1,331 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(highcharter)
+library(formattable)
+library(plotly)
+library(countrycode)
+library(maps)
+library(heatmaply)
+
+```
+
+```{r}
+data(worldgeojson)
+file_15 <- "C:\\Users\\yonat\\OneDrive\\שולחן העבודה\\yonatan\\Study\\third year B\\data visualization\\visu_project\\2015.csv"
+file_16 <- "C:\\Users\\yonat\\OneDrive\\שולחן העבודה\\yonatan\\Study\\third year B\\data visualization\\visu_project\\2016.csv"
+file_17 <- "C:\\Users\\yonat\\OneDrive\\שולחן העבודה\\yonatan\\Study\\third year B\\data visualization\\visu_project\\2017.csv"
+file_18 <- "C:\\Users\\yonat\\OneDrive\\שולחן העבודה\\yonatan\\Study\\third year B\\data visualization\\visu_project\\2018.csv"
+file_19 <- "C:\\Users\\yonat\\OneDrive\\שולחן העבודה\\yonatan\\Study\\third year B\\data visualization\\visu_project\\2019.csv"
+file <- "C:\\Users\\yonat\\OneDrive\\שולחן העבודה\\yonatan\\Study\\third year B\\data visualization\\visu_project\\df.csv"
+
+df15<-read.csv(file_15)
+df16<-read.csv(file_16)
+df17<-read.csv(file_17)
+df18<-read.csv(file_18)
+df19<-read.csv(file_19)
+df<-read.csv(file)
+df18
+```
+
+```{r}
+library(shiny)
+library(DT)
+library(corrplot)
+
+
+ui <- fluidPage(
+    titlePanel("World Happiness visualization"),
+    h3("Happiness Rank Comparison between 2015 to 2019"),
+    h5("Here you can play around and see the different ranks of the countries happiness between 2015 and 2019. enjoy!"),
+    tabPanel("Rank Table", dataTableOutput("rankTable")),
+    h3("Features correlation by year"),
+    h5("Which feature influence Happines the most?"),
+    tabsetPanel(
+    tabPanel("Heatmap 2015", plotOutput("heatmap2015")),
+    tabPanel("Heatmap 2016", plotOutput("heatmap2016")),
+    tabPanel("Heatmap 2017", plotOutput("heatmap2017")),
+    tabPanel("Heatmap 2018", plotOutput("heatmap2018")),
+    tabPanel("Heatmap 2019", plotOutput("heatmap2019"))),
+    h3("Features correlation by year"),
+    h5("Which feature influence Happines the most?"),
+    tabPanel("Scatter Plot", plotlyOutput("scatterPlot"))
+  
+)
+server <- function(input, output) {
+  df1 <- merge(df15[, c(1, 2)],
+               df19[, c(1, 2)],
+               by.x = "Country",
+               by.y = "Country")
+  
+  colnames(df1) <- c("Country", "Happiness Rank 2015", "Happiness Rank 2019")
+  
+  df1 <- df1 %>%
+    mutate(`Rank Change` = `Happiness Rank 2015` - `Happiness Rank 2019`)
+  
+  output$rankTable <- renderDataTable({
+    datatable(df1) %>%
+      formatStyle(
+        "Rank Change",
+        color = styleInterval(0, c("red", "green"))
+      )
+  })
+  
+  output$heatmap2015 <- renderPlot({
+    corrplot(cor(as.matrix(df15[,-c(1, 2)])), method = "color", type = "upper")
+  })
+  
+  output$heatmap2016 <- renderPlot({
+    corrplot(cor(as.matrix(df16[,-c(1, 2)])), method = "color", type = "upper")
+  })
+  
+  output$heatmap2017 <- renderPlot({
+    corrplot(cor(as.matrix(df17[,-c(1, 2)])), method = "color", type = "upper")
+  })
+  
+  output$heatmap2018 <- renderPlot({
+    corrplot(cor(as.matrix(df18[,-c(1, 2)])), method = "color", type = "upper")
+  })
+  
+  output$heatmap2019 <- renderPlot({
+    corrplot(cor(as.matrix(df19[,-c(1, 2)])), method = "color", type = "upper")
+  })
+  output$scatterPlot <- renderPlotly({
+    filteredData <- df[df$year %in% input$year, ]
+
+    fig <- plot_ly(data = filteredData, x = ~Economy, y = ~Score,
+                   type = "scatter", mode = "markers",
+                   marker = list(size = 10, symbol = "circle",
+                                 color = ~as.factor(year),
+                                 colors = "Set1"),
+                   text = ~paste("Country: ", Country, "<br>",
+                                 "Year: ", year, "<br>",
+                                 "GDP per capita: $", Economy, "<br>",
+                                 "Happiness Score: ", Score),
+                   hovertemplate = paste('%{text}<extra></extra>'))
+
+    fig <- fig %>% layout(xaxis = list(title = "GDP per Capita"),
+                          yaxis = list(title = "Happiness Score"),
+                          title = "GDP per capita and Happiness Score",
+                          showlegend = TRUE,
+                          legend = list(title = "Year"))
+
+    # Add linear trendline for each selected year
+    for (yr in unique(filteredData$year)) {
+      yearData <- filteredData[filteredData$year == yr, ]
+      fig <- fig %>% add_trace(x = ~Economy, y = fitted(lm(Score ~ Economy, data = yearData)),
+                               type = "scatter", mode = "lines", name = paste("Linear Trendline ", yr))
+    }
+}
+
+```
+
+
+```{r}
+# Run the app
+shinyApp(ui = ui, server = server)
+```
+
+```{r}
+library(plotly)
+
+fig <- plot_ly(df, x = ~Economy, y = ~Score, color = ~year, type = "scatter", mode = "markers",
+               marker = list(size = 10, symbol = "circle"),
+               text = ~paste("Country: ", Country, "<br>",
+                             "Year: ", year, "<br>",
+                             "GDP per capita: $", Economy, "<br>",
+                             "Happiness Score: ", Score),
+               hovertemplate = paste('%{text}<extra></extra>'))
+
+fig <- fig %>% layout(xaxis = list(title = "GDP per Capita"),
+                      yaxis = list(title = "Happiness Score"),
+                      title = "GDP per capita and Happiness Score",
+                      showlegend = TRUE,
+                      legend = list(title = "Year"))
+
+fig
+```
+
+```{r}
+library(shiny)
+library(plotly)
+
+# Define UI
+ui <- fluidPage(
+  titlePanel("GDP per capita and Happiness Score"),
+  sidebarLayout(
+    sidebarPanel(
+      checkboxGroupInput("year", "Select Year(s):", choices = unique(df$year),
+                         selected = unique(df$year))
+    ),
+    mainPanel(
+      plotlyOutput("scatterPlot")
+    )
+  )
+)
+
+# Define server
+server <- function(input, output) {
+  output$scatterPlot <- renderPlotly({
+    filteredData <- df[df$year %in% input$year, ]
+
+    fig <- plot_ly(data = filteredData, x = ~Economy, y = ~Score,
+                   type = "scatter", mode = "markers",
+                   marker = list(size = 10, symbol = "circle",
+                                 color = ~as.factor(year),
+                                 colors = "Set1"),
+                   text = ~paste("Country: ", Country, "<br>",
+                                 "Year: ", year, "<br>",
+                                 "GDP per capita: $", Economy, "<br>",
+                                 "Happiness Score: ", Score),
+                   hovertemplate = paste('%{text}<extra></extra>'))
+
+    fig <- fig %>% layout(xaxis = list(title = "GDP per Capita"),
+                          yaxis = list(title = "Happiness Score"),
+                          title = "GDP per capita and Happiness Score",
+                          showlegend = TRUE,
+                          legend = list(title = "Year"))
+
+    # Add linear trendline for each selected year
+    for (yr in unique(filteredData$year)) {
+      yearData <- filteredData[filteredData$year == yr, ]
+      fig <- fig %>% add_trace(x = ~Economy, y = fitted(lm(Score ~ Economy, data = yearData)),
+                               type = "scatter", mode = "lines", name = paste("Linear Trendline ", yr))
+    }
+
+    fig
+  })
+}
+
+# Run the Shiny app
+shinyApp(ui = ui, server = server)
+```
+
+
+```{r}
+```
+
+
+
+
+
+
+
+```{r}
+
+
+```
+
+```{r}
+formattable(df1,list(
+  `Rank Change` = formatter(
+    "span",
+    style=~formattable::style(color=ifelse(`Rank Change`>0,"green","red")))))%>%
+    as.datatable()
+```
+```{r}
+# light grey boundaries
+l <- list(color = toRGB("grey"), width = 0.2)
+
+# specify map projection/options
+g <- list(
+  showframe = FALSE,
+  showcoastlines = FALSE,
+  projection = list(type = 'Mercator')
+)
+
+p <- plot_geo(df) %>%
+  add_trace(
+    z = ~Score, color = ~Score, colors = 'Blues',
+    text = ~Country, locations = ~code, marker = list(line = l)
+  ) %>%
+  colorbar(title = 'Happiness Score', limits=c(0,10), thickness=10) %>%
+  layout(
+    title = 'World Happiness Score',
+    geo = g
+  )
+
+htmltools::tagList(list(p))
+```
+```{r}
+# Create the tabs and add the plots to the respective tabs
+tabs <- hc_tabs(
+  hc_tab("Plot 1", test1),
+  hc_tab("Plot 2", test2)
+)
+
+# Display the tabs
+tabs
+```
+
+```{r}
+test2
+```
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+# Create scatter plots for each year
+p15 <- plot_ly(data = df15, x = ~gdp_per_capita, y = ~score, type = 'scatter', mode = 'lines',
+               name = '2015', marker = list(color = 'green'), text = ~region)
+p16 <- plot_ly(data = df16, x = ~gdp_per_capita, y = ~score, type = 'scatter', mode = 'lines',
+               name = '2016', marker = list(color = 'red'), text = ~region)
+p17 <- plot_ly(data = df17, x = ~gdp_per_capita, y = ~score, type = 'scatter', mode = 'lines',
+               name = '2017', marker = list(color = 'violet'), text = ~region)
+p18 <- plot_ly(data = df18, x = ~gdp_per_capita, y = ~score, type = 'scatter', mode = 'lines',
+               name = '2018', marker = list(color = 'blue'), text = ~region)
+p19 <- plot_ly(data = df19, x = ~gdp_per_capita, y = ~score, type = 'scatter', mode = 'lines',
+               name = '2019', marker = list(color = 'black'), text = ~region)
+
+# Combine the scatter plots into a single plot
+data <- list(p15, p16, p17, p18, p19)
+layout <- list(title = 'Happiness Score vs GDP per Capita',
+               xaxis = list(title = 'GDP per Capita', ticklen = 5, zeroline = FALSE),
+               yaxis = list(title = 'Happiness Score', ticklen = 5, zeroline = FALSE))
+
+# Create the plot
+fig <- plot_ly(data = data, layout = layout)
+
+# Display the plot
+fig
+```
+
+```{r}
+plot_ly(df16,x=~Country,
+        y=~Happiness.Score,
+        type="box",
+        boxpoints="all",
+        pointpos = -1.8,
+        color=~Country)%>%
+  layout(xaxis=list(showticklabels = FALSE),
+         margin=list(b = 100))
+```
+
+```{r}
+fig = px.scatter(finaldf, x="gdp_per_capita", 
+                 y="score",
+                 facet_row="year",
+                color="year",
+                trendline= "ols")
+fig.update(layout_coloraxis_showscale=False)
+fig.update_traces(textposition='top center')
+fig.update_layout(
+    height=800,
+    title_text='GDP per capita and Happiness Score'
+)
+fig.show()
+
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
